@@ -1,0 +1,19 @@
+# .NET Core
+bin/
+obj/
+
+# User-specific files
+.vscode/
+
+# Project user settings
+*.user
+
+# IDE files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# .NET Core build directories
+project.lock.json
+project.fragment.lock.json
