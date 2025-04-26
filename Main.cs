@@ -60,61 +60,72 @@ namespace CellTowerFrequencies
             Console.WriteLine($"|{new string('-', GUI_WIDTH)}|");
         }
 
-        public static void PrintDataTable(String filePath)
+        public static List<CellTower> PrintDataTable(string filePath)
         {
-            String line;
+            string line;
+            int tableWidth = GUI_WIDTH - PADDING;
+            int tableHeaderWidth = 0;
+            string tableHeader = "+";
+            // Each row of the text file data (i.e., one cell tower record)
+            List<CellTower> records = [];
+
             try
             {
+                PrintMessage("Reading data from file...");
+
                 // Create a StreamReader object to read the file
                 StreamReader sr = new(filePath);
+
                 //Read the first line of text
                 line = sr.ReadLine();
+
                 //Check if the line is not null (end of file)
                 if (line == null)
                 {
-                    PrintMessage("File is empty");
-                    return;
+                    return [];
                 }
 
                 // Split headers
-                Console.WriteLine(line);
-                String[] headers = line.Split(",");
+                string[] headers = line.Split(",");
 
                 if (headers == null || headers.Length == 0)
                 {
-                    PrintMessage("No headers found in file");
-                    return;
+                    return [];
                 }
-                // Print headers in table format
-                int tableWidth = GUI_WIDTH - PADDING;
-                int tableHeaderWidth = tableWidth / headers.Length;
-                string tableHeader = "+" + new string(' ', 2);
+
+                // build headers in table format
+                tableHeaderWidth = tableWidth / headers.Length;
                 foreach (var header in headers)
                 {
-                    tableHeader += "|  " + header + "  ";
+                    tableHeader += new string(' ', 2) + header + "  |";
                 }
-                tableHeader += "  |" + new string(' ', 2) + "+";
-                Console.WriteLine($"|{new string(' ', PADDING/2)}{new string('+', tableHeader.Length)}{new string(' ', PADDING/2)}|");                 
-                Console.WriteLine($"|{new string(' ', PADDING/2)}{tableHeader}{new string(' ', PADDING/2)}|");
-                Console.WriteLine($"|{new string(' ', PADDING/2)}{new string('+', tableHeader.Length)}{new string(' ', PADDING/2)}|");
+                tableHeader += "+";
 
-                // Each row of the text file data (i.e., one cell tower record)
-                List<String[]> records = [];
+                // Read the next line - this will be the first record of data
+                line = sr.ReadLine();
 
                 //Continue to read until you reach end of file
                 while (line != null)
                 {
                     //capture data in the line
-                    String[] data = line.Split(",");
-                    //check if the data is not null (end of file)
+                    string[] data = line.Split(",");
+
+                    // check if we reached the end of the file
                     if (data == null)
                     {
-                        PrintMessage("End of file reached");
+                        break;
+                    }
+
+                    // check if the data contains the correct number of columns
+                    if (data.Length != headers.Length)
+                    {
+                        PrintMessage($"Incorrect number of columns in line: {line}. Skipping Cell: " + data[0]);
                         break;
                     }
 
                     // add the data to the records list
-                    records.Add(data);
+                    CellTower cellTower = new CellTower(data[0], data[1], data[2], data[3], data[4]);
+                    records.Add(cellTower);
 
                     // print row of data in table format
                     // Console.WriteLine($"|{new string('-', GUI_WIDTH)}|");
@@ -126,12 +137,32 @@ namespace CellTowerFrequencies
                 }
                 //close the file
                 sr.Close();
-                Console.ReadLine();
+                
+                // Show Table
+                // --- Header ---
+                // Console.WriteLine($"|{new string(' ', PADDING/2)}{new string('+', tableHeader.Length)}{new string(' ', PADDING/2)}|");                 
+                // Console.WriteLine($"|{new string(' ', PADDING/2)}{tableHeader}{new string(' ', PADDING/2)}|");
+                // Console.WriteLine($"|{new string(' ', PADDING/2)}{new string('+', tableHeader.Length)}{new string(' ', PADDING/2)}|");
+                // // --- Data ---
+                // foreach (var record in records)
+                // {
+                //     string row = "|";
+                //     for (int i=0; i<record.Length; i++)
+                //     {
+                //         row += new string(' ', PADDING/2) + "+" + new string(' ', 2) + $"{record[i], }" + new string(' ', 2) + "|";
+                //     }
+                //     Console.WriteLine($"|{new string(' ', PADDING/2)}{row}{new string(' ', PADDING/2)}|");
+                // }
+
+                // Console.WriteLine($"|{new string(' ', PADDING/2)}{new string('+', tableHeader.Length)}{new string(' ', PADDING/2)}|");
+
+                return records;
             }
             catch(Exception e)
             {
                 PrintMessage($"Error when printing the data table. Ensure that the file exists and is not empty.");
                 Console.WriteLine(e.Message);
+                return [];
             }
         }
 
@@ -145,11 +176,26 @@ namespace CellTowerFrequencies
             string filePath = "./data/celltowerData.txt";
 
             // show data in table format
-            PrintDataTable(filePath);
+            List<CellTower> cellTowers = PrintDataTable(filePath);
 
+            if (cellTowers == null || cellTowers.Count == 0)
+            {
+                PrintMessage("No data found in file. Exiting application.");
+                return;
+            }
 
+            for (int i = 0; i < cellTowers.Count; i++)
+            {
+                Console.WriteLine($"Cell Tower {i + 1}: {cellTowers[i].Id}");
+                Console.WriteLine($"Latitude: {cellTowers[i].Latitude}");
+                Console.WriteLine($"Longitude: {cellTowers[i].Longitude}");
+                Console.WriteLine($"Northing: {cellTowers[i].Northing}");
+                Console.WriteLine($"Easting: {cellTowers[i].Easting}");
+                Console.WriteLine($"No. of nearby cell towers: {cellTowers[i].NearbyCellTowers.Count}");
+                Console.WriteLine();
+            }
 
-
+            // Print the footer
             PrintTerminalFooter();
         }
     }

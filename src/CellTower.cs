@@ -1,6 +1,6 @@
 public class CellTower
 {
-    public int Id { get; set; }
+    public string Id { get; set; }
     public string Latitude { get; set; }
     public string Longitude { get; set; }
     public string Northing { get; set; }
@@ -14,7 +14,7 @@ public class CellTower
         set { _nearbyCellTowers = value; }
     }
 
-    public CellTower(int id, string latitude, string longitude, string northing, string easting)
+    public CellTower(string id, string latitude, string longitude, string northing, string easting)
     {
         Id = id;
         Latitude = latitude;
