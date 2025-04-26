@@ -124,7 +124,7 @@ namespace CellTowerFrequencies
                     }
 
                     // add the data to the records list
-                    CellTower cellTower = new CellTower(data[0], data[1], data[2], data[3], data[4]);
+                    CellTower cellTower = new CellTower(id:data[0], easting:double.Parse(data[1]), northing:double.Parse(data[2]), longitude:double.Parse(data[3]), latitude:double.Parse(data[4]));
                     records.Add(cellTower);
 
                     // print row of data in table format
@@ -168,8 +168,11 @@ namespace CellTowerFrequencies
 
         static void Main(string[] args)
         {
-            string title = "Cell Tower Frequency Distributer Application";
-            int padding = 5;
+            // ----------------------------------------------------------------------------------------------------------------------
+            // Distance Thereshold: We make the assumption that the minimum distance to classify a cell tower as "close" is 500m.
+            // ----------------------------------------------------------------------------------------------------------------------
+            int closeThreshold = 500; // meters
+
             PrintTerminalHeader();
 
             // file path to Txt file
@@ -186,13 +189,25 @@ namespace CellTowerFrequencies
 
             for (int i = 0; i < cellTowers.Count; i++)
             {
-                Console.WriteLine($"Cell Tower {i + 1}: {cellTowers[i].Id}");
+                // add neighbouring or out of range cell towers to each cell tower
+                for (int j = 0; j < cellTowers.Count; j++)
+                {
+                    if (i != j)
+                    {
+                        cellTowers[i].AddCellTower(cellTowers[j], closeThreshold);
+                    }
+                }
+
+                // Print the cell tower details
+                Console.WriteLine($"Cell Tower ID: {cellTowers[i].Id}");
                 Console.WriteLine($"Latitude: {cellTowers[i].Latitude}");
                 Console.WriteLine($"Longitude: {cellTowers[i].Longitude}");
                 Console.WriteLine($"Northing: {cellTowers[i].Northing}");
                 Console.WriteLine($"Easting: {cellTowers[i].Easting}");
-                Console.WriteLine($"No. of nearby cell towers: {cellTowers[i].NearbyCellTowers.Count}");
-                Console.WriteLine();
+                Console.WriteLine($"Frequency: {cellTowers[i].frequency}");
+                Console.WriteLine($"Nearby Cell Towers: {string.Join(", ", cellTowers[i].NearbyCellTowers.Select(t => t.Item1.Id))}");
+                Console.WriteLine($"Out of Range Cell Towers: {string.Join(", ", cellTowers[i].OutOfRangeCellTowers.Select(t => t.Item1.Id))}");
+
             }
 
             // Print the footer
