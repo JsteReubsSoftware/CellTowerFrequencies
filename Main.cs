@@ -6,13 +6,15 @@ namespace CellTowerFrequencies
     {
         public static string TITLE { get { return "Cell Tower Frequency Distributer Application"; } }
         public static int PADDING { get { return 15; } }
-        public static int GUI_WIDTH { get { return TITLE.Length + (PADDING * 2); } }
+        public static int GUI_WIDTH { get { return 10 + TITLE.Length + (PADDING * 2); } }
+        public static int MENU_WIDTH { get { return GUI_WIDTH - 2 * PADDING; } }
+        public static Dictionary<string, string> CONFIG { get; set;}
 
         static void PrintTerminalHeader()
         {
             // Console.Clear();
             Console.WriteLine($"|{new string('-', GUI_WIDTH)}|");
-            Console.WriteLine($"|{new string(' ', PADDING)}{TITLE}{new string(' ', PADDING)}|");
+            Console.WriteLine($"|{new string(' ', PADDING)}{TITLE}{new string(' ', GUI_WIDTH - (PADDING+TITLE.Length))}|");
             Console.WriteLine($"|{new string('-', GUI_WIDTH)}|");
         }
 
@@ -23,7 +25,7 @@ namespace CellTowerFrequencies
             Console.WriteLine($"|{new string('-', GUI_WIDTH)}|");
         }
 
-        public static void PrintMessage(string message) // prints a message in the center of the GUI
+        public static void PrintMessage(string message, bool addBottomBorder = true) // prints a message in the center of the GUI
         {
             if (string.IsNullOrWhiteSpace(message))
             {
@@ -57,7 +59,14 @@ namespace CellTowerFrequencies
             }
 
             // Print the bottom border
-            Console.WriteLine($"|{new string('-', GUI_WIDTH)}|");
+            if (addBottomBorder)
+            {
+                Console.WriteLine($"|{new string('-', GUI_WIDTH)}|");
+            }
+            else
+            {
+                Console.WriteLine($"|{new string(' ', GUI_WIDTH)}|");
+            }
         }
 
         public static List<CellTower> PrintDataTable(string filePath)
@@ -166,52 +175,208 @@ namespace CellTowerFrequencies
             }
         }
 
+        public static void PrintMenu()
+        {
+            string msg = "Please select an option from the menu below:";
+            string[] options = {
+                "Update Configuration",
+                "Run Application",
+                "View data",
+                "Exit Application"
+            };
+            
+            string output = "";
+            for (int i=0; i<options.Length; i++)
+            {
+                string enterText = $"{$"- Enter '{i+1}'",10}";
+                string innerText = $"{i+1}.{options[i],-35}{enterText}";
+                output += "|"+ new string(' ', PADDING/2) + innerText + new string(' ', GUI_WIDTH - (PADDING / 2 + innerText.Length)) + "|\n";
+            }
+            output += "|"+ new string(' ', GUI_WIDTH) + "|";
+
+            Console.WriteLine("|"+ new string(' ', GUI_WIDTH) + "|\n" +
+                            "|"+ new string(' ', PADDING / 2) + msg + new string(' ', GUI_WIDTH - (PADDING / 2 + msg.Length)) + "|");
+            Console.WriteLine(output);
+        }
+
+        public static void PrintConfiguration(bool updatingConfig = false)
+        {
+            string msg = "Application Configuration:";
+            string[] options = [ // if you update these please also update the CONFIG variable in the first part of the Main method
+                "File Path",
+                "Distance Threshold",
+                "Frequency Range",
+                "Number of Frequencies"
+            ];
+
+            if (updatingConfig)
+            {
+                options = [options[0], options[1], "<- Back", "<- Exit Application"]; // we exclude the option to change frequencies. The specification document states to use the default values.
+            }
+
+            string output = "";
+            for (int i=0; i<options.Length; i++)
+            {
+                string innerText = $"{i+1}.{options[i],-35}";
+                innerText += updatingConfig ? $"{$"- Enter '{i+1}'",10}" : $"{CONFIG[options[i]],30}";
+                
+                output += "|"+ new string(' ', PADDING/2) + innerText + new string(' ', GUI_WIDTH - (PADDING / 2 + innerText.Length)) + "|\n";
+            }
+
+            output += "|"+ new string(' ', GUI_WIDTH) + "|";
+
+            Console.WriteLine("|"+ new string(' ', PADDING / 2) + msg + new string(' ', GUI_WIDTH - (PADDING / 2 + msg.Length)) + "|");
+            Console.WriteLine(output);
+        }
+
+
+        public static void UpdateConfiguration(string key, string value)
+        {
+            if (CONFIG.ContainsKey(key))
+            {
+                CONFIG[key] = value;
+            }
+            else
+            {
+                PrintMessage($"Invalid key: {key}. Please try again.");
+            }
+        }
+
+        public static string PromptUser(string msg = "Please enter your choice: ", bool optionSelection = true)
+        {
+            Console.Write("|"+ new string(' ', PADDING / 2) + msg);
+            string choice = Console.ReadLine();
+            return choice;
+        }
+
         static void Main(string[] args)
         {
             // ----------------------------------------------------------------------------------------------------------------------
             // Distance Thereshold: We make the assumption that the minimum distance to classify a cell tower as "close" is 500m.
             // ----------------------------------------------------------------------------------------------------------------------
+            // default values
+            string filePath = "./data/celltowerData.txt"; // path to the data file
             int closeThreshold = 500; // meters
+            int numFrequencies = 6; // number of frequencies that can be used
+            int[] freqRange = new int[numFrequencies]; // range of frequencies that can be used
+            int startFreq = 110; // starting frequency
+
+            for (int i = 0; i < numFrequencies; i++)
+            {
+                freqRange[i] = startFreq + i; // define the range of frequencies
+            }
+
+            // Set the configuration values
+            CONFIG = new Dictionary<string, string>();
+            CONFIG["File Path"] = filePath;
+            CONFIG["Distance Threshold"] = closeThreshold.ToString();
+            CONFIG["Frequency Range"] = string.Join(", ", freqRange);
+            CONFIG["Number of Frequencies"] = numFrequencies.ToString();
 
             PrintTerminalHeader();
-
-            // file path to Txt file
-            string filePath = "./data/celltowerData.txt";
-
-            // show data in table format
-            List<CellTower> cellTowers = PrintDataTable(filePath);
-
-            if (cellTowers == null || cellTowers.Count == 0)
+            PrintMessage(new string(' ', PADDING) + "Welcome!", addBottomBorder: false);
+            PrintConfiguration();
+            while (true)
             {
-                PrintMessage("No data found in file. Exiting application.");
-                return;
-            }
+                PrintMenu();
+                
+                // Prompt user for input
+                string choice = PromptUser();
 
-            for (int i = 0; i < cellTowers.Count; i++)
-            {
-                // add neighbouring or out of range cell towers to each cell tower
-                for (int j = 0; j < cellTowers.Count; j++)
+                // process option
+                switch(choice)
                 {
-                    if (i != j)
-                    {
-                        cellTowers[i].AddCellTower(cellTowers[j], closeThreshold);
-                    }
+                    case "1":
+                        // Update Configuration
+                        bool validInput = false;
+                        while (!validInput)
+                        {
+                            PrintConfiguration(updatingConfig: true);
+                            choice = PromptUser();
+
+                            switch (choice)
+                            {
+                                case "1":
+                                    choice = PromptUser("Please enter the new file path: ");
+
+                                    if (string.IsNullOrWhiteSpace(choice) || !File.Exists(choice))
+                                    {
+                                        PrintMessage($"Invalid file path. The path: '{choice}' does not exist. Please try again. By selecting which option to update.");
+                                        break;
+                                    }
+                                    UpdateConfiguration("FilePath", choice);  
+                                    // maybe print updated configuration
+
+                                    validInput = true;
+                                    break;
+                                case "2":
+                                    choice = PromptUser("Please enter the new distance threshold (in meters): ");
+                                    if (string.IsNullOrWhiteSpace(choice) || int.Parse(choice) <= 0)
+                                    {
+                                        PrintMessage($"Invalid distance threshold. Please try again. By selecting which option to update.");
+                                        break;
+                                    }
+                                    UpdateConfiguration("DistThreshold", choice);
+                                    validInput = true;
+                                    break;
+                                case "3":
+                                    validInput = true;
+                                    break;
+                                case "4":
+                                    PrintMessage("Exiting application...");
+                                    return;
+                                default:
+                                    PrintMessage($"Invalid option. Please try again. By selecting which option to update.");
+                                    break;
+                            }
+                        }
+                        
+
+                        break;
+                    case "2":
+                        // Run Application
+                        PrintMessage("Running application...");
+                        break;
+                    case "3":
+                        // View Data
+                        PrintMessage("Viewing data...");
+                        break;
+                    case "4":
+                        // Exit Application
+                        PrintMessage("Exiting application...");
+                        return;
                 }
-
-                // Print the cell tower details
-                Console.WriteLine($"Cell Tower ID: {cellTowers[i].Id}");
-                Console.WriteLine($"Latitude: {cellTowers[i].Latitude}");
-                Console.WriteLine($"Longitude: {cellTowers[i].Longitude}");
-                Console.WriteLine($"Northing: {cellTowers[i].Northing}");
-                Console.WriteLine($"Easting: {cellTowers[i].Easting}");
-                Console.WriteLine($"Frequency: {cellTowers[i].frequency}");
-                Console.WriteLine($"Nearby Cell Towers: {string.Join(", ", cellTowers[i].NearbyCellTowers.Select(t => t.Item1.Id))}");
-                Console.WriteLine($"Out of Range Cell Towers: {string.Join(", ", cellTowers[i].OutOfRangeCellTowers.Select(t => t.Item1.Id))}");
-
             }
 
-            // Print the footer
-            PrintTerminalFooter();
+            // // Print the header
+            // PrintTerminalHeader();
+
+            // // show data in table format and return the list of cell towers
+            // List<CellTower> cellTowers = PrintDataTable(filePath);
+
+            // if (cellTowers == null || cellTowers.Count == 0)
+            // {
+            //     PrintMessage("No data found in file. Exiting application.");
+            //     return;
+            // }
+
+            // for (int i = 0; i < cellTowers.Count; i++)
+            // {
+            //     // add neighbouring or out of range cell towers to each cell tower
+            //     for (int j = 0; j < cellTowers.Count; j++)
+            //     {
+            //         if (i != j)
+            //         {
+            //             cellTowers[i].AddCellTower(cellTowers[j], closeThreshold);
+            //         }
+            //     }
+            // }
+
+            // // Run the Graph Coloring Algorithm to assign frequencies to the cell towers
+            // GraphColoringAlgorithm gca = new GraphColoringAlgorithm()
+
+            // // Print the footer
+            // PrintTerminalFooter();
         }
     }
 }
