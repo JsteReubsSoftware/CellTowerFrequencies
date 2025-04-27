@@ -201,10 +201,10 @@ namespace CellTowerFrequencies
 
         public static void PrintConfiguration(bool updatingConfig = false)
         {
-            string msg = "Application Configuration:";
+            string msg = "Select property to update:";
             string[] options = [ // if you update these please also update the CONFIG variable in the first part of the Main method
                 "File Path",
-                "Distance Threshold",
+                "Distance Threshold (m)",
                 "Frequency Range",
                 "Number of Frequencies"
             ];
@@ -225,7 +225,8 @@ namespace CellTowerFrequencies
 
             output += "|"+ new string(' ', GUI_WIDTH) + "|";
 
-            Console.WriteLine("|"+ new string(' ', PADDING / 2) + msg + new string(' ', GUI_WIDTH - (PADDING / 2 + msg.Length)) + "|");
+            Console.WriteLine("|"+ new string(' ', GUI_WIDTH) + "|\n" +
+                            "|"+ new string(' ', PADDING / 2) + msg + new string(' ', GUI_WIDTH - (PADDING / 2 + msg.Length)) + "|");
             Console.WriteLine(output);
         }
 
@@ -235,6 +236,7 @@ namespace CellTowerFrequencies
             if (CONFIG.ContainsKey(key))
             {
                 CONFIG[key] = value;
+                PrintMessage($"Configuration updated: {key} = {value}");
             }
             else
             {
@@ -269,7 +271,7 @@ namespace CellTowerFrequencies
             // Set the configuration values
             CONFIG = new Dictionary<string, string>();
             CONFIG["File Path"] = filePath;
-            CONFIG["Distance Threshold"] = closeThreshold.ToString();
+            CONFIG["Distance Threshold (m)"] = closeThreshold.ToString();
             CONFIG["Frequency Range"] = string.Join(", ", freqRange);
             CONFIG["Number of Frequencies"] = numFrequencies.ToString();
 
@@ -304,7 +306,7 @@ namespace CellTowerFrequencies
                                         PrintMessage($"Invalid file path. The path: '{choice}' does not exist. Please try again. By selecting which option to update.");
                                         break;
                                     }
-                                    UpdateConfiguration("FilePath", choice);  
+                                    UpdateConfiguration("File Path", choice);  
                                     // maybe print updated configuration
 
                                     validInput = true;
@@ -316,7 +318,7 @@ namespace CellTowerFrequencies
                                         PrintMessage($"Invalid distance threshold. Please try again. By selecting which option to update.");
                                         break;
                                     }
-                                    UpdateConfiguration("DistThreshold", choice);
+                                    UpdateConfiguration("Distance Threshold (m)", choice);
                                     validInput = true;
                                     break;
                                 case "3":
