@@ -62,15 +62,15 @@ public class GraphColoringAlgorithm
             {
                 CellTower currTower = cellTowers[ctIdx];
 
+                // if current tower has a frequency assigned, we skip it
+                if (currTower.frequency != -1) // frequency assigned
+                {
+                    continue; // go to the next tower
+                }
+
                 // first we retrieve the neighbouring and non-neighbouring towers
                 List<(CellTower, double)> nearbyTowers = currTower.NearbyCellTowers;
                 List<(CellTower, double)> outOfRangeTowers = currTower.OutOfRangeCellTowers;
-
-                // print the current tower and its neighbours
-                Console.WriteLine("Current Tower: " + currTower.Id + " Neighbours: " + string.Join(", ", nearbyTowers.Select(t => t.Item1.Id)));
-                // Console.WriteLine("Distances Nearby Towers: " + string.Join(", ", nearbyTowers.Select(t => t.Item2)));
-                Console.WriteLine("Current Tower: " + currTower.Id + " Out of Range Towers: " + string.Join(", ", outOfRangeTowers.Select(t => t.Item1.Id)));
-                // Console.WriteLine("Distances Out of Range Towers: " + string.Join(", ", outOfRangeTowers.Select(t => t.Item2)));
 
                 if (outOfRangeTowers.Count > 0) // there are some towers out of range
                 {
@@ -94,25 +94,18 @@ public class GraphColoringAlgorithm
                     // check if current tower has no neighbours
                     if (nearbyTowers.Count == 0)
                     {
-                        //the tower has no neighbours so it can be assigned the same frequency as the farthest tower
-                        currTower.frequency = farthestTower.frequency;
-                        // increase the frequency count
-                        IncrementFrequencyCount(currTower);
-                    }
-                    else // the tower has neighbours so we first need to check if we can assign the same frequency as the farthest tower
-                    {
-                        // retrieve available frequencies
-                        List<int> freqRange = frequencyCount.Select(fc => fc.Item1).ToList();
-
-                        foreach ((CellTower, double) t in outOfRangeTowers)
+                        //the tower has no neighbours so it can be assigned the same frequency as the farthest tower if the farthest tower has a frequency
+                        if (farthestTower.frequency == -1) // farthest tower has no frequency assigned
                         {
-                            if (freqRange.Contains(t.Item1.frequency)) // if the frequency is in the range of frequencies available
-                            {
-                                freqRange.Remove(t.Item1.frequency); // remove the frequency from the range
-                            }
+                            // assign any frequency to the current tower
+                            int randomFreqIdx = random.Next(0, numFrequencies);
+                            currTower.frequency = frequencyCount[randomFreqIdx].Item1;
+                            farthestTower.frequency = currTower.frequency; // assign the same frequency to the farthest tower
+                            // increase the frequency count twice since we assigned the same frequency to both towers
+                            IncrementFrequencyCount(currTower);
+                            IncrementFrequencyCount(farthestTower);
                         }
-
-                        if (freqRange.Count > 0 && freqRange.Contains(farthestTower.frequency))
+                        else // the farthest tower has a frequency assigned
                         {
                             // assign the same frequency as the farthest tower
                             currTower.frequency = farthestTower.frequency;
@@ -120,14 +113,52 @@ public class GraphColoringAlgorithm
                             IncrementFrequencyCount(currTower);
                         }
                     }
-                    // print current tower frequency
-                    Console.WriteLine("Current Tower: " + currTower.Id + " Frequency: " + currTower.frequency);
-                    Console.WriteLine("Farthest Tower: " + farthestTower.Id + " Frequency: " + farthestTower.frequency);
+                    else // the tower has neighbours so we first need to check if we can assign the same frequency as the farthest tower
+                    {
+                        // retrieve available frequencies
+                        List<int> freqRange = frequencyCount.Select(fc => fc.Item1).ToList();
+
+                        foreach ((CellTower, double) t in nearbyTowers)
+                        {
+                            if (freqRange.Contains(t.Item1.frequency)) // if the frequency is in the range of frequencies available
+                            {
+                                freqRange.Remove(t.Item1.frequency); // remove the frequency from the range
+                            }
+                        }
+
+                        if (freqRange.Count > 0) // there are available frequencies
+                        {
+                            if (farthestTower.frequency != -1 && freqRange.Contains(farthestTower.frequency))
+                            {
+                                currTower.frequency = farthestTower.frequency; // assign the same frequency to the current tower                                
+                                // increase the frequency count
+                                IncrementFrequencyCount(currTower);
+                            }
+                            else if (farthestTower.frequency != -1 && !freqRange.Contains(farthestTower.frequency))// assign any frequency from the available frequencies
+                            {
+                                int randomFreqIdx = random.Next(0, freqRange.Count);
+                                currTower.frequency = freqRange[randomFreqIdx];
+                                
+                                // increase the frequency count 
+                                IncrementFrequencyCount(currTower);
+                            }
+                            else // assign any frequency from the available frequencies
+                            {
+                                int randomFreqIdx = random.Next(0, freqRange.Count);
+                                currTower.frequency = freqRange[randomFreqIdx];
+                                farthestTower.frequency = currTower.frequency; // assign the same frequency to the farthest tower
+                                
+                                // increase the frequency count twice since we assigned the same frequency to both towers
+                                IncrementFrequencyCount(currTower);
+                                IncrementFrequencyCount(farthestTower);
+                            }
+                        }
+                    }
                 }
-                else
-                {
-                    Console.WriteLine("--No out of range towers for current tower: " + currTower.Id);
-                }
+                // else
+                // {
+                //     // the tower has no out of range towers so we can assign any frequency to it
+                // }
             }
 
             // return the frequency count

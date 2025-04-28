@@ -7,7 +7,7 @@ namespace CellTowerFrequencies
     {
         public static string TITLE { get { return "Cell Tower Frequency Distributer Application"; } }
         public static int PADDING { get { return 15; } }
-        public static int GUI_WIDTH { get { return Math.Max(120, 10 + TITLE.Length + (PADDING * 2)); } }
+        public static int GUI_WIDTH { get { return Math.Max(140, 10 + TITLE.Length + (PADDING * 2)); } }
         public static string[] FILE_HEADERS { get; set; } // headers of the data file
         public static List<CellTower> CELL_TOWER_DATA { get; set; } // list of cell towers
         public static Dictionary<string, string> CONFIG { get; set;}
@@ -142,6 +142,10 @@ namespace CellTowerFrequencies
                 FILE_HEADERS = headers;
 
                 // add cell towers and set max lengths
+                OTHER_TOWERS = new List<(string, string, string)>(); // reset the other towers list
+                MAX_LENGTH_NEARBY = 0; // reset the max length of the nearby cell towers
+                MAX_LENGTH_OUT_OF_RANGE = 0; // reset the max length of the out of range cell towers
+                
                 double threshold = double.Parse(CONFIG["Distance Threshold (m)"]);
                 for (int i = 0; i < CELL_TOWER_DATA.Count; i++)
                 {
@@ -177,7 +181,7 @@ namespace CellTowerFrequencies
             }
         }
 
-        public static (string, string, int, int) BuildTableHeader(string[] headers, bool showingList = false)
+        public static (string, string, int, int) BuildTableHeader(string[] headers, bool showingList = false, int maxColWidth = 0)
         {// returns (tableHeader, headingBorder, numCols, idColWidth, otherTowers, maxLengthNearby, maxLengthOutOfRange)
             int numCols = headers.Length;
             int colWidth = headers.Select(x => x.Length).Max() + 4; // add 2 for padding
@@ -191,11 +195,15 @@ namespace CellTowerFrequencies
             {
                 if (showingList && c == 1) // if showing list, we need to add the max length of the nearby towers
                 {
-                    headingBorder += $"{new string('-', MAX_LENGTH_NEARBY)}+";
+                    headingBorder += $"{new string('-', (MAX_LENGTH_NEARBY > colWidth ? MAX_LENGTH_NEARBY : colWidth))}+";
                 }
                 else if (showingList && c == 2) // if showing list, we need to add the max length of the out of range towers
                 {
-                    headingBorder += $"{new string('-', MAX_LENGTH_OUT_OF_RANGE)}+";
+                    headingBorder += $"{new string('-', (MAX_LENGTH_OUT_OF_RANGE > colWidth ? MAX_LENGTH_OUT_OF_RANGE : colWidth))}+";
+                }
+                else if (maxColWidth > 0 && c == 1) // if showing list, we need to add the max length of the nearby towers
+                {
+                    headingBorder += $"{new string('-',  (maxColWidth > colWidth ? maxColWidth : colWidth))}+";
                 }
                 else
                 {
@@ -209,11 +217,15 @@ namespace CellTowerFrequencies
             {
                 if (showingList && h == 1) // if showing list, we need to add the max length of the nearby towers
                 {
-                    tableHeaderNames += $"{new string(' ', 2)}{headers[h]}{new string(' ', MAX_LENGTH_NEARBY - (2 + headers[h].Length))}|";
+                    tableHeaderNames += $"{new string(' ', 2)}{headers[h]}{new string(' ', (MAX_LENGTH_NEARBY > colWidth ? MAX_LENGTH_NEARBY : colWidth) - (2 + headers[h].Length))}|";
                 }
                 else if (showingList && h == 2) // if showing list, we need to add the max length of the out of range towers
                 {
-                    tableHeaderNames += $"{new string(' ', 2)}{headers[h]}{new string(' ', MAX_LENGTH_OUT_OF_RANGE - (2 + headers[h].Length))}|";
+                    tableHeaderNames += $"{new string(' ', 2)}{headers[h]}{new string(' ', (MAX_LENGTH_OUT_OF_RANGE > colWidth ? MAX_LENGTH_OUT_OF_RANGE : colWidth) - (2 + headers[h].Length))}|";
+                }
+                else if (maxColWidth > 0 && h == 1) // if showing list, we need to add the max length of the nearby towers
+                {
+                    tableHeaderNames += $"{new string(' ', 2)}{headers[h]}{new string(' ', (maxColWidth > colWidth ? maxColWidth : colWidth) - (2 + headers[h].Length))}|";
                 }
                 else
                 {
@@ -293,12 +305,12 @@ namespace CellTowerFrequencies
                 for (int i=0; i<CELL_TOWER_DATA.Count; i++)
                 {
                     string row = $"|{new string(' ', PADDING/2)}|{new string(' ', 2)}{CELL_TOWER_DATA[i].Id}{new string(' ', colWidth - (2 + CELL_TOWER_DATA[i].Id.Length))}|"+
-                                $"{new string(' ', 2)}{OTHER_TOWERS[i].Item2}{new string(' ', MAX_LENGTH_NEARBY - (2 + OTHER_TOWERS[i].Item2.Length))}|" +
-                                $"{new string(' ', 2)}{OTHER_TOWERS[i].Item3}{new string(' ', MAX_LENGTH_OUT_OF_RANGE - (2 + OTHER_TOWERS[i].Item3.Length))}|";
+                                $"{new string(' ', 2)}{OTHER_TOWERS[i].Item2}{new string(' ', (MAX_LENGTH_NEARBY > colWidth ? MAX_LENGTH_NEARBY : colWidth) - (2 + OTHER_TOWERS[i].Item2.Length))}|" +
+                                $"{new string(' ', 2)}{OTHER_TOWERS[i].Item3}{new string(' ', (MAX_LENGTH_OUT_OF_RANGE > colWidth ? MAX_LENGTH_OUT_OF_RANGE : colWidth) - (2 + OTHER_TOWERS[i].Item3.Length))}|";
                     tableData += row + new string(' ', GUI_WIDTH - row.Length + 1) + "|\n";
                 }
-                
-                tableData += $"|{new string(' ', PADDING/2)}{headingBorder}{new string(' ', GUI_WIDTH - (PADDING / 2 + headingBorder.Length))}|\n";
+                int requiredWidth = GUI_WIDTH - (PADDING / 2 + headingBorder.Length);
+                tableData += $"|{new string(' ', PADDING/2)}{headingBorder}{new string(' ', (requiredWidth > 0 ? requiredWidth : 0))}|\n";
 
                 string cellTowerNearbyOutOfRangeData = tableHeader + tableData + "|"+ new string(' ', GUI_WIDTH) + "|";
                 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -518,43 +530,53 @@ namespace CellTowerFrequencies
                         }
 
                         // Print the frequency count
-                        string[] freqTableHeaders = ["Frequency (MHz)", "Count"];
-                        int colWidth = freqTableHeaders.Select(x => x.Length).Max() + 4; // add 2 for padding
-                        colWidth = Math.Max(colWidth, 10); // minimum column width
-                        string borderTopBottom = $"+{new string('-', colWidth)}+{new string('-', colWidth)}+";
-                        
-                        // create header
-                        string freqTblHeader = $"|{new string(' ', PADDING / 2)}{borderTopBottom}{new string(' ', GUI_WIDTH - (PADDING / 2 + borderTopBottom.Length))}|\n";
-                        string freqTblHeaderNames = $"|";
-                        for (int i=0; i<freqTableHeaders.Length; i++)
-                        {
-                            freqTblHeaderNames += $"{new string(' ', 2)}{freqTableHeaders[i]}{new string(' ', colWidth - (2 + freqTableHeaders[i].Length))}|";
-                        }
-                        freqTblHeader += $"|{new string(' ', PADDING/2)}{freqTblHeaderNames}{new string(' ', GUI_WIDTH - (PADDING / 2 + freqTblHeaderNames.Length))}|\n";
-                        freqTblHeader += $"|{new string(' ', PADDING/2)}{borderTopBottom}{new string(' ', GUI_WIDTH - (PADDING / 2 + borderTopBottom.Length))}|\n";
-
-                        // create footer
-                        string footerMsg = $"|{new string(' ', 2)}Total Frequencies Used: {frequencyCount.Sum(x => x.Item2)}/{numFrequencies}";
-                        footerMsg += $"{new string(' ', borderTopBottom.Length - footerMsg.Length - 1)}|";
-                        
-                        string freqTblFooter = $"|{new string(' ', PADDING/2)}{borderTopBottom}{new string(' ', GUI_WIDTH - (PADDING / 2 + borderTopBottom.Length))}|\n";
-                        freqTblFooter += $"|{new string(' ', PADDING/2)}{footerMsg}{new string(' ', GUI_WIDTH - (PADDING / 2 + footerMsg.Length))}|\n";
-                        freqTblFooter += $"|{new string(' ', PADDING/2)}{borderTopBottom}{new string(' ', GUI_WIDTH - (PADDING / 2 + borderTopBottom.Length))}|";
-
-                        // create data
+                        string[] freqTableHeaders = ["Frequency (MHz)", "Towers Assigned"];
                         string freqTblData = "";
-                        for (int i = 0; i < frequencyCount.Count; i++)
+                
+                        // create data
+                        List<(string, string)> freqTblDataList = new List<(string, string)>(); // stores frequency and Ids
+                        
+                        for (int f=0; f<frequencyCount.Count; f++)
                         {
-                            string row = $"|{new string(' ', PADDING/2)}|{new string(' ', 2)}{frequencyCount[i].Item1}{new string(' ', colWidth - (2 + frequencyCount[i].Item1.ToString().Length))}|"+
-                                $"{new string(' ', 2)}{frequencyCount[i].Item2}{new string(' ', colWidth - (2 + frequencyCount[i].Item2.ToString().Length))}|";
+                            freqTblDataList.Add((frequencyCount[f].Item1.ToString(), ""));
+                        }
+                        freqTblDataList.Add(("N/A", ""));
+                        // add the frequencies to the list
+                        for (int i=0; i<CELL_TOWER_DATA.Count; i++)
+                        {
+                            int Idx = freqTblDataList.Select(x => x.Item1).ToList().IndexOf(CELL_TOWER_DATA[i].frequency.ToString());
+                            if (Idx == -1)
+                            {
+                                Idx = freqTblDataList.Count - 1; // add to the last item in the list
+                            }
+                            freqTblDataList[Idx] = (freqTblDataList[Idx].Item1, freqTblDataList[Idx].Item2 + CELL_TOWER_DATA[i].Id + ",");
+                        }                        
+                        // trim the last comma from the Ids
+                        for (int i=0; i<freqTblDataList.Count; i++)
+                        {
+                            freqTblDataList[i] = (freqTblDataList[i].Item1, freqTblDataList[i].Item2.TrimEnd(','));
+                        }
+
+                        // set Second column width to the max length of the Ids
+                        int maxLength = freqTblDataList.Select(x => x.Item2.Length).Max() + 4; // add 2 for padding
+                        
+                        // build the header based on the max length of the Ids
+                        (string, string, int, int) tupleHeader2 = BuildTableHeader(freqTableHeaders, maxColWidth:maxLength);
+                        string freqTblHeader = tupleHeader2.Item1;
+                        string borderTopBottom = tupleHeader2.Item2;
+                        int colWidth = tupleHeader2.Item4;
+
+                        for (int i = 0; i < freqTblDataList.Count; i++)
+                        {
+                            string row = $"|{new string(' ', PADDING/2)}|{new string(' ', 2)}{freqTblDataList[i].Item1}{new string(' ', colWidth - (2 + freqTblDataList[i].Item1.ToString().Length))}|"+
+                                $"{new string(' ', 2)}{freqTblDataList[i].Item2}{new string(' ', (maxLength > colWidth ? maxLength : colWidth) - (2 + freqTblDataList[i].Item2.ToString().Length))}|";
                             freqTblData += row + new string(' ', GUI_WIDTH - row.Length + 1) + "|\n";
                         }
-                        freqTblData += $"|{new string(' ', PADDING/2)}{borderTopBottom}{new string(' ', GUI_WIDTH - (PADDING / 2 + borderTopBottom.Length))}|\n";
+                        freqTblData += $"|{new string(' ', PADDING/2)}{borderTopBottom}{new string(' ', GUI_WIDTH - (PADDING / 2 + borderTopBottom.Length))}|";
 
                         string msg = $"Successfully ran application. Frequencies assigned to cell towers:";
                         Console.WriteLine($"|{new string(' ', PADDING /2)}{msg}{new string (' ', GUI_WIDTH - (PADDING / 2 + msg.Length))}|");
-                        Console.WriteLine(freqTblHeader + freqTblData + freqTblFooter);
-                        Console.WriteLine($"|{new string(' ', GUI_WIDTH)}|");
+                        Console.WriteLine(freqTblHeader + freqTblData);
                         break;
                     case "3":
                         // View Data
