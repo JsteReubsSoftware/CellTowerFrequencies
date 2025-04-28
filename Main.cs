@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 
 namespace CellTowerFrequencies
 {
@@ -7,7 +8,8 @@ namespace CellTowerFrequencies
         public static string TITLE { get { return "Cell Tower Frequency Distributer Application"; } }
         public static int PADDING { get { return 15; } }
         public static int GUI_WIDTH { get { return 10 + TITLE.Length + (PADDING * 2); } }
-        public static int MENU_WIDTH { get { return GUI_WIDTH - 2 * PADDING; } }
+        public static string[] FILE_HEADERS { get; set; } // headers of the data file
+        public static List<CellTower> CELL_TOWER_DATA { get; set; } // list of cell towers
         public static Dictionary<string, string> CONFIG { get; set;}
 
         static void PrintTerminalHeader()
@@ -69,29 +71,24 @@ namespace CellTowerFrequencies
             }
         }
 
-        public static List<CellTower> PrintDataTable(string filePath)
+        public static void BuildCellTowers()
         {
             string line;
-            int tableWidth = GUI_WIDTH - PADDING;
-            int tableHeaderWidth = 0;
-            string tableHeader = "+";
             // Each row of the text file data (i.e., one cell tower record)
             List<CellTower> records = [];
 
             try
             {
-                PrintMessage("Reading data from file...");
-
                 // Create a StreamReader object to read the file
-                StreamReader sr = new(filePath);
+                StreamReader sr = new StreamReader(CONFIG["File Path"]) ?? throw new Exception("File not found.");
 
                 //Read the first line of text
-                line = sr.ReadLine();
+                line = sr.ReadLine() ?? string.Empty;
 
                 //Check if the line is not null (end of file)
-                if (line == null)
+                if (line == null || line.Length == 0)
                 {
-                    return [];
+                    throw new Exception($"Error when reading the file. Ensure that the file contains data.");
                 }
 
                 // Split headers
@@ -99,28 +96,20 @@ namespace CellTowerFrequencies
 
                 if (headers == null || headers.Length == 0)
                 {
-                    return [];
+                    throw new Exception($"Error when building the cell towers. The file contains no headers.");
                 }
-
-                // build headers in table format
-                tableHeaderWidth = tableWidth / headers.Length;
-                foreach (var header in headers)
-                {
-                    tableHeader += new string(' ', 2) + header + "  |";
-                }
-                tableHeader += "+";
 
                 // Read the next line - this will be the first record of data
-                line = sr.ReadLine();
+                line = sr.ReadLine() ?? string.Empty;
 
                 //Continue to read until you reach end of file
-                while (line != null)
+                while (line != null && line.Length > 0)
                 {
                     //capture data in the line
                     string[] data = line.Split(",");
 
                     // check if we reached the end of the file
-                    if (data == null)
+                    if (data == null || data.Length == 0)
                     {
                         break;
                     }
@@ -128,50 +117,99 @@ namespace CellTowerFrequencies
                     // check if the data contains the correct number of columns
                     if (data.Length != headers.Length)
                     {
-                        PrintMessage($"Incorrect number of columns in line: {line}. Skipping Cell: " + data[0]);
-                        break;
+                        PrintMessage($"Incorrect number of columns in line: {line}. Skipping Cell: " + data[0], addBottomBorder: false);
+                        //Read the next line
+                        line = sr.ReadLine() ?? string.Empty;
+                        continue;
                     }
 
                     // add the data to the records list
                     CellTower cellTower = new CellTower(id:data[0], easting:double.Parse(data[1]), northing:double.Parse(data[2]), longitude:double.Parse(data[3]), latitude:double.Parse(data[4]));
-                    records.Add(cellTower);
-
-                    // print row of data in table format
-                    // Console.WriteLine($"|{new string('-', GUI_WIDTH)}|");
-                    // Console.WriteLine($"|{new string(' ', PADDING)}{string.Join(new string(' ', headerWidth), data)}{new string(' ', PADDING)}|");
-                    // Console.WriteLine($"|{new string('-', GUI_WIDTH)}|");                    
+                    records.Add(cellTower);                    
 
                     //Read the next line
-                    line = sr.ReadLine();                    
+                    line = sr.ReadLine() ?? string.Empty;                    
                 }
                 //close the file
                 sr.Close();
+
+                // Update global variables
+                CELL_TOWER_DATA = records;
+                FILE_HEADERS = headers;
+
+                PrintMessage($"Cell tower data built successfully. {records.Count} records found.");
+            }
+            catch(Exception e)
+            {
+                PrintMessage($"Error building cell tower data.");
+                Console.WriteLine(e.Message);
+            }
+        }
+
+        public static void PrintDataTable(string filePath)
+        {
+            try
+            {
+                // Check if data has been built
+                if (CELL_TOWER_DATA == null) {
+                    PrintMessage($"Cell tower data not built. Building data from file: {filePath}.");
+                    BuildCellTowers();
+                }
                 
-                // Show Table
-                // --- Header ---
-                // Console.WriteLine($"|{new string(' ', PADDING/2)}{new string('+', tableHeader.Length)}{new string(' ', PADDING/2)}|");                 
-                // Console.WriteLine($"|{new string(' ', PADDING/2)}{tableHeader}{new string(' ', PADDING/2)}|");
-                // Console.WriteLine($"|{new string(' ', PADDING/2)}{new string('+', tableHeader.Length)}{new string(' ', PADDING/2)}|");
-                // // --- Data ---
-                // foreach (var record in records)
-                // {
-                //     string row = "|";
-                //     for (int i=0; i<record.Length; i++)
-                //     {
-                //         row += new string(' ', PADDING/2) + "+" + new string(' ', 2) + $"{record[i], }" + new string(' ', 2) + "|";
-                //     }
-                //     Console.WriteLine($"|{new string(' ', PADDING/2)}{row}{new string(' ', PADDING/2)}|");
-                // }
+                if (CELL_TOWER_DATA == null || CELL_TOWER_DATA.Count == 0)
+                {
+                    throw new Exception($"Error when printing the data table. The file contains no data.");
+                }
 
-                // Console.WriteLine($"|{new string(' ', PADDING/2)}{new string('+', tableHeader.Length)}{new string(' ', PADDING/2)}|");
+                // check if file headers are valid
+                if (FILE_HEADERS == null || FILE_HEADERS.Length == 0)
+                {
+                    throw new Exception($"Error when printing the data table. The file contains no headers.");
+                }
 
-                return records;
+                // build headers in table format
+                int tableWidth = GUI_WIDTH - PADDING;
+                int numCols = FILE_HEADERS.Length;
+                int colWidth = FILE_HEADERS.Select(x => x.Length).Max() + 4; // add 2 for padding
+                colWidth = Math.Max(colWidth, 10); // minimum column width
+                string tableHeader = $"|{new string(' ', PADDING/2)}";
+                string headingBorder = "+";
+                string tableData = "";
+                string tableHeaderNames = "|";
+
+                // build header border
+                for (int c=0; c<numCols; c++)
+                {
+                    headingBorder += $"{new string('-', colWidth)}+";
+                }
+                tableHeader += headingBorder + $"{new string(' ', GUI_WIDTH - (PADDING/2 + headingBorder.Length))}|\n";
+
+                // build header names
+                for (int h=0; h<FILE_HEADERS.Length; h++)
+                {
+                    tableHeaderNames += $"{new string(' ', 2)}{FILE_HEADERS[h]}{new string(' ', colWidth - (2 + FILE_HEADERS[h].Length))}|";
+                }
+                tableHeader += $"|{new string(' ', PADDING/2)}{tableHeaderNames}{new string(' ', GUI_WIDTH - (PADDING / 2 + tableHeaderNames.Length))}|\n";
+                tableHeader += $"|{new string(' ', PADDING/2)}{headingBorder}{new string(' ', GUI_WIDTH - (PADDING / 2 + headingBorder.Length))}|\n";
+
+                // Print table content
+                for (int i=0; i<CELL_TOWER_DATA.Count; i++)
+                {
+                    string row = $"|{new string(' ', PADDING/2)}|{new string(' ', 2)}{CELL_TOWER_DATA[i].Id}{new string(' ', colWidth - (2 + CELL_TOWER_DATA[i].Id.Length))}|"+
+                                $"{new string(' ', 2)}{CELL_TOWER_DATA[i].Easting}{new string(' ', colWidth - (2 + CELL_TOWER_DATA[i].Easting.ToString().Length))}|" +
+                                $"{new string(' ', 2)}{CELL_TOWER_DATA[i].Northing}{new string(' ', colWidth - (2 + CELL_TOWER_DATA[i].Northing.ToString().Length))}|" +
+                                $"{new string(' ', 2)}{CELL_TOWER_DATA[i].Longitude}{new string(' ', colWidth - (2 + CELL_TOWER_DATA[i].Longitude.ToString().Length))}|" +
+                                $"{new string(' ', 2)}{CELL_TOWER_DATA[i].Latitude}{new string(' ', colWidth - (2 + CELL_TOWER_DATA[i].Latitude.ToString().Length))}|";
+                    tableData += row + new string(' ', GUI_WIDTH - row.Length + 1) + "|\n";
+                }
+                tableData += $"|{new string(' ', PADDING/2)}{headingBorder}{new string(' ', GUI_WIDTH - (PADDING / 2 + headingBorder.Length))}|\n";
+                
+                Console.WriteLine(tableHeader + tableData + "|"+ new string(' ', GUI_WIDTH) + "|");
             }
             catch(Exception e)
             {
                 PrintMessage($"Error when printing the data table. Ensure that the file exists and is not empty.");
                 Console.WriteLine(e.Message);
-                return [];
             }
         }
 
@@ -338,10 +376,72 @@ namespace CellTowerFrequencies
                     case "2":
                         // Run Application
                         PrintMessage("Running application...");
+
+                        // build cell towers from the data file
+                        if (CELL_TOWER_DATA == null || CELL_TOWER_DATA.Count == 0)
+                        {                    
+                            PrintMessage($"Cell tower data not built. Building data from file: {CONFIG["File Path"]}.");        
+                            BuildCellTowers();
+                        }
+
+                        if (CELL_TOWER_DATA == null || CELL_TOWER_DATA.Count == 0)
+                        {
+                            PrintMessage("No cell tower data found. Exiting application.");
+                            return;
+                        }
+
+                        GraphColoringAlgorithm gca = new GraphColoringAlgorithm(freqRange);
+                        List<(int, int)> frequencyCount = gca.RunGCA(CELL_TOWER_DATA, 42);
+
+                        if (frequencyCount == null || frequencyCount.Count == 0)
+                        {
+                            PrintMessage("Error running the graph coloring algorithm. Exiting application.");
+                            return;
+                        }
+
+                        // Print the frequency count
+                        string[] freqTableHeaders = ["Frequency (MHz)", "Count"];
+                        int colWidth = freqTableHeaders.Select(x => x.Length).Max() + 4; // add 2 for padding
+                        colWidth = Math.Max(colWidth, 10); // minimum column width
+                        string borderTopBottom = $"+{new string('-', colWidth)}+{new string('-', colWidth)}+";
+                        
+                        // create header
+                        string freqTblHeader = $"|{new string(' ', PADDING / 2)}{borderTopBottom}{new string(' ', GUI_WIDTH - (PADDING / 2 + borderTopBottom.Length))}|\n";
+                        string freqTblHeaderNames = $"|";
+                        for (int i=0; i<freqTableHeaders.Length; i++)
+                        {
+                            freqTblHeaderNames += $"{new string(' ', 2)}{freqTableHeaders[i]}{new string(' ', colWidth - (2 + freqTableHeaders[i].Length))}|";
+                        }
+                        freqTblHeader += $"|{new string(' ', PADDING/2)}{freqTblHeaderNames}{new string(' ', GUI_WIDTH - (PADDING / 2 + freqTblHeaderNames.Length))}|\n";
+                        freqTblHeader += $"|{new string(' ', PADDING/2)}{borderTopBottom}{new string(' ', GUI_WIDTH - (PADDING / 2 + borderTopBottom.Length))}|\n";
+
+                        // create footer
+                        string footerMsg = $"|{new string(' ', 2)}Total Frequencies Used: {frequencyCount.Sum(x => x.Item2)}/{numFrequencies}";
+                        footerMsg += $"{new string(' ', borderTopBottom.Length - footerMsg.Length - 1)}|";
+                        
+                        string freqTblFooter = $"|{new string(' ', PADDING/2)}{borderTopBottom}{new string(' ', GUI_WIDTH - (PADDING / 2 + borderTopBottom.Length))}|\n";
+                        freqTblFooter += $"|{new string(' ', PADDING/2)}{footerMsg}{new string(' ', GUI_WIDTH - (PADDING / 2 + footerMsg.Length))}|\n";
+                        freqTblFooter += $"|{new string(' ', PADDING/2)}{borderTopBottom}{new string(' ', GUI_WIDTH - (PADDING / 2 + borderTopBottom.Length))}|";
+
+                        // create data
+                        string freqTblData = "";
+                        for (int i = 0; i < frequencyCount.Count; i++)
+                        {
+                            string row = $"|{new string(' ', PADDING/2)}|{new string(' ', 2)}{frequencyCount[i].Item1}{new string(' ', colWidth - (2 + frequencyCount[i].Item1.ToString().Length))}|"+
+                                $"{new string(' ', 2)}{frequencyCount[i].Item2}{new string(' ', colWidth - (2 + frequencyCount[i].Item2.ToString().Length))}|";
+                            freqTblData += row + new string(' ', GUI_WIDTH - row.Length + 1) + "|\n";
+                        }
+                        freqTblData += $"|{new string(' ', PADDING/2)}{borderTopBottom}{new string(' ', GUI_WIDTH - (PADDING / 2 + borderTopBottom.Length))}|\n";
+
+                        string msg = $"Successfully ran application. Frequencies assigned to cell towers:";
+                        Console.WriteLine($"|{new string(' ', PADDING /2)}{msg}{new string (' ', GUI_WIDTH - (PADDING / 2 + msg.Length))}|");
+                        Console.WriteLine(freqTblHeader + freqTblData + freqTblFooter);
+                        Console.WriteLine($"|{new string(' ', GUI_WIDTH)}|");
                         break;
                     case "3":
                         // View Data
                         PrintMessage("Viewing data...");
+                        PrintDataTable(CONFIG["File Path"]);
                         break;
                     case "4":
                         // Exit Application
