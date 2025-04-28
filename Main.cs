@@ -7,10 +7,14 @@ namespace CellTowerFrequencies
     {
         public static string TITLE { get { return "Cell Tower Frequency Distributer Application"; } }
         public static int PADDING { get { return 15; } }
-        public static int GUI_WIDTH { get { return 10 + TITLE.Length + (PADDING * 2); } }
+        public static int GUI_WIDTH { get { return Math.Max(120, 10 + TITLE.Length + (PADDING * 2)); } }
         public static string[] FILE_HEADERS { get; set; } // headers of the data file
         public static List<CellTower> CELL_TOWER_DATA { get; set; } // list of cell towers
         public static Dictionary<string, string> CONFIG { get; set;}
+        public static int MAX_LENGTH_NEARBY { get; set; } = 0; // maximum length of the nearby cell towers
+        public static int MAX_LENGTH_OUT_OF_RANGE { get; set; } = 0; // maximum length of the out of range cell towers
+        public static List<(string, string, string)> OTHER_TOWERS { get; set; }// list of other towers
+        public static bool UPDATED_CONFIG { get; set; } = false; // flag to check if the configuration has been updated
 
         static void PrintTerminalHeader()
         {
@@ -137,6 +141,33 @@ namespace CellTowerFrequencies
                 CELL_TOWER_DATA = records;
                 FILE_HEADERS = headers;
 
+                // add cell towers and set max lengths
+                double threshold = double.Parse(CONFIG["Distance Threshold (m)"]);
+                for (int i = 0; i < CELL_TOWER_DATA.Count; i++)
+                {
+                    // add neighbouring or out of range cell towers to each cell tower
+                    for (int j = 0; j < CELL_TOWER_DATA.Count; j++)
+                    {
+                        bool containsNearby = CELL_TOWER_DATA[i].NearbyCellTowers.Any(t => t.Item1 == CELL_TOWER_DATA[j]);
+                        bool containsOutOfRange = CELL_TOWER_DATA[i].OutOfRangeCellTowers.Any(t => t.Item1 == CELL_TOWER_DATA[j]);
+
+                        if (i != j && !containsNearby && !containsOutOfRange)
+                        {
+                            CELL_TOWER_DATA[i].AddCellTower(CELL_TOWER_DATA[j], threshold);
+                        }
+                    }
+                    OTHER_TOWERS.Add((CELL_TOWER_DATA[i].Id, string.Join(",", CELL_TOWER_DATA[i].NearbyCellTowers.Select(x => x.Item1.Id)), string.Join(",", CELL_TOWER_DATA[i].OutOfRangeCellTowers.Select(x => x.Item1.Id))));
+                    
+                    if (OTHER_TOWERS[i].Item2.Length+4 > MAX_LENGTH_NEARBY)
+                    {
+                        MAX_LENGTH_NEARBY = OTHER_TOWERS[i].Item2.Length + 4;
+                    }
+                    if (OTHER_TOWERS[i].Item3.Length+4 > MAX_LENGTH_OUT_OF_RANGE)
+                    {
+                        MAX_LENGTH_OUT_OF_RANGE = OTHER_TOWERS[i].Item3.Length + 4;
+                    }
+                }
+
                 PrintMessage($"Cell tower data built successfully. {records.Count} records found.");
             }
             catch(Exception e)
@@ -144,6 +175,56 @@ namespace CellTowerFrequencies
                 PrintMessage($"Error building cell tower data.");
                 Console.WriteLine(e.Message);
             }
+        }
+
+        public static (string, string, int, int) BuildTableHeader(string[] headers, bool showingList = false)
+        {// returns (tableHeader, headingBorder, numCols, idColWidth, otherTowers, maxLengthNearby, maxLengthOutOfRange)
+            int numCols = headers.Length;
+            int colWidth = headers.Select(x => x.Length).Max() + 4; // add 2 for padding
+            colWidth = Math.Max(colWidth, 10); // minimum column width
+            string tableHeader = $"|{new string(' ', PADDING/2)}";
+            string headingBorder = "+";
+            string tableHeaderNames = "|";
+
+            // build header border
+            for (int c=0; c<numCols; c++)
+            {
+                if (showingList && c == 1) // if showing list, we need to add the max length of the nearby towers
+                {
+                    headingBorder += $"{new string('-', MAX_LENGTH_NEARBY)}+";
+                }
+                else if (showingList && c == 2) // if showing list, we need to add the max length of the out of range towers
+                {
+                    headingBorder += $"{new string('-', MAX_LENGTH_OUT_OF_RANGE)}+";
+                }
+                else
+                {
+                    headingBorder += $"{new string('-', colWidth)}+";
+                }
+            }
+            tableHeader += headingBorder + $"{new string(' ', GUI_WIDTH - (PADDING/2 + headingBorder.Length))}|\n";
+
+            // build header names
+            for (int h=0; h<numCols; h++)
+            {
+                if (showingList && h == 1) // if showing list, we need to add the max length of the nearby towers
+                {
+                    tableHeaderNames += $"{new string(' ', 2)}{headers[h]}{new string(' ', MAX_LENGTH_NEARBY - (2 + headers[h].Length))}|";
+                }
+                else if (showingList && h == 2) // if showing list, we need to add the max length of the out of range towers
+                {
+                    tableHeaderNames += $"{new string(' ', 2)}{headers[h]}{new string(' ', MAX_LENGTH_OUT_OF_RANGE - (2 + headers[h].Length))}|";
+                }
+                else
+                {
+                    tableHeaderNames += $"{new string(' ', 2)}{headers[h]}{new string(' ', colWidth - (2 + headers[h].Length))}|";
+                }
+                
+            }
+            tableHeader += $"|{new string(' ', PADDING/2)}{tableHeaderNames}{new string(' ', GUI_WIDTH - (PADDING / 2 + tableHeaderNames.Length))}|\n";
+            tableHeader += $"|{new string(' ', PADDING/2)}{headingBorder}{new string(' ', GUI_WIDTH - (PADDING / 2 + headingBorder.Length))}|\n";
+
+            return (tableHeader, headingBorder, numCols, colWidth);
         }
 
         public static void PrintDataTable(string filePath)
@@ -167,30 +248,19 @@ namespace CellTowerFrequencies
                     throw new Exception($"Error when printing the data table. The file contains no headers.");
                 }
 
+                // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                //                      BUILD A TABLE FOR SHOWING TOWER COORDINATES
+                // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
                 // build headers in table format
-                int tableWidth = GUI_WIDTH - PADDING;
-                int numCols = FILE_HEADERS.Length;
-                int colWidth = FILE_HEADERS.Select(x => x.Length).Max() + 4; // add 2 for padding
-                colWidth = Math.Max(colWidth, 10); // minimum column width
-                string tableHeader = $"|{new string(' ', PADDING/2)}";
-                string headingBorder = "+";
-                string tableData = "";
-                string tableHeaderNames = "|";
-
-                // build header border
-                for (int c=0; c<numCols; c++)
-                {
-                    headingBorder += $"{new string('-', colWidth)}+";
-                }
-                tableHeader += headingBorder + $"{new string(' ', GUI_WIDTH - (PADDING/2 + headingBorder.Length))}|\n";
-
-                // build header names
-                for (int h=0; h<FILE_HEADERS.Length; h++)
-                {
-                    tableHeaderNames += $"{new string(' ', 2)}{FILE_HEADERS[h]}{new string(' ', colWidth - (2 + FILE_HEADERS[h].Length))}|";
-                }
-                tableHeader += $"|{new string(' ', PADDING/2)}{tableHeaderNames}{new string(' ', GUI_WIDTH - (PADDING / 2 + tableHeaderNames.Length))}|\n";
-                tableHeader += $"|{new string(' ', PADDING/2)}{headingBorder}{new string(' ', GUI_WIDTH - (PADDING / 2 + headingBorder.Length))}|\n";
+                (string, string, int, int) tupleHeader = BuildTableHeader(FILE_HEADERS);
+                string tableHeader = tupleHeader.Item1;
+                string headingBorder = tupleHeader.Item2;
+                int numCols = tupleHeader.Item3;
+                int colWidth = tupleHeader.Item4;
+                string tableData = "";                
 
                 // Print table content
                 for (int i=0; i<CELL_TOWER_DATA.Count; i++)
@@ -204,11 +274,48 @@ namespace CellTowerFrequencies
                 }
                 tableData += $"|{new string(' ', PADDING/2)}{headingBorder}{new string(' ', GUI_WIDTH - (PADDING / 2 + headingBorder.Length))}|\n";
                 
-                Console.WriteLine(tableHeader + tableData + "|"+ new string(' ', GUI_WIDTH) + "|");
+                string cellTowerDistData = tableHeader + tableData + "|"+ new string(' ', GUI_WIDTH) + "|";
+
+                // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                //                      BUILD A TABLE FOR SHOWING NEARBY TOWERS & OUT OF RANGE TOWERS
+                // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                string[] tableHeaders = ["Cell Tower", "Nearby", "Out of Range"];
+                (string, string, int, int) tupleHeader2 = BuildTableHeader(tableHeaders, showingList: true);
+                tableHeader = tupleHeader2.Item1;
+                headingBorder = tupleHeader2.Item2;
+                numCols = tupleHeader2.Item3;
+                colWidth = tupleHeader2.Item4;
+                tableData = "";
+
+                // Print table content
+                for (int i=0; i<CELL_TOWER_DATA.Count; i++)
+                {
+                    string row = $"|{new string(' ', PADDING/2)}|{new string(' ', 2)}{CELL_TOWER_DATA[i].Id}{new string(' ', colWidth - (2 + CELL_TOWER_DATA[i].Id.Length))}|"+
+                                $"{new string(' ', 2)}{OTHER_TOWERS[i].Item2}{new string(' ', MAX_LENGTH_NEARBY - (2 + OTHER_TOWERS[i].Item2.Length))}|" +
+                                $"{new string(' ', 2)}{OTHER_TOWERS[i].Item3}{new string(' ', MAX_LENGTH_OUT_OF_RANGE - (2 + OTHER_TOWERS[i].Item3.Length))}|";
+                    tableData += row + new string(' ', GUI_WIDTH - row.Length + 1) + "|\n";
+                }
+                
+                tableData += $"|{new string(' ', PADDING/2)}{headingBorder}{new string(' ', GUI_WIDTH - (PADDING / 2 + headingBorder.Length))}|\n";
+
+                string cellTowerNearbyOutOfRangeData = tableHeader + tableData + "|"+ new string(' ', GUI_WIDTH) + "|";
+                // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                //                                              PRINT CONTENT
+                // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+                Console.WriteLine(cellTowerDistData);
+                Console.WriteLine($"|{new string(' ', GUI_WIDTH)}|");
+                Console.WriteLine(cellTowerNearbyOutOfRangeData);
+                Console.WriteLine($"|{new string(' ', GUI_WIDTH)}|");
+
             }
             catch(Exception e)
             {
-                PrintMessage($"Error when printing the data table. Ensure that the file exists and is not empty.");
+                PrintMessage($"Error when printing the data table.");
                 Console.WriteLine(e.Message);
             }
         }
@@ -300,6 +407,9 @@ namespace CellTowerFrequencies
             int numFrequencies = 6; // number of frequencies that can be used
             int[] freqRange = new int[numFrequencies]; // range of frequencies that can be used
             int startFreq = 110; // starting frequency
+            int seed = 42; // seed for random number generation
+            // set global seed
+            Random rand = new Random(seed);
 
             for (int i = 0; i < numFrequencies; i++)
             {
@@ -370,12 +480,20 @@ namespace CellTowerFrequencies
                                     break;
                             }
                         }
-                        
+                        UPDATED_CONFIG = true; // set the flag to true to indicate that the configuration has been updated  
+                        OTHER_TOWERS = new List<(string, string, string)>(); // reset the other towers list
+                        CELL_TOWER_DATA = new List<CellTower>(); // reset the cell tower data                      
 
                         break;
                     case "2":
                         // Run Application
                         PrintMessage("Running application...");
+
+                        // if the configuration has been updated, we need to update the cell tower data
+                        if (UPDATED_CONFIG) {
+                            PrintMessage("Configuration updated. Building cell tower data.");
+                            UPDATED_CONFIG = false;
+                        }
 
                         // build cell towers from the data file
                         if (CELL_TOWER_DATA == null || CELL_TOWER_DATA.Count == 0)
@@ -391,7 +509,7 @@ namespace CellTowerFrequencies
                         }
 
                         GraphColoringAlgorithm gca = new GraphColoringAlgorithm(freqRange);
-                        List<(int, int)> frequencyCount = gca.RunGCA(CELL_TOWER_DATA, 42);
+                        List<(int, int)> frequencyCount = gca.RunGCA(CELL_TOWER_DATA, rand);
 
                         if (frequencyCount == null || frequencyCount.Count == 0)
                         {

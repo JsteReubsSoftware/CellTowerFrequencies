@@ -32,7 +32,7 @@ public class GraphColoringAlgorithm
         }
     }
 
-    public List<(int, int)> RunGCA(List<CellTower> cellTowers, int seed)
+    public List<(int, int)> RunGCA(List<CellTower> cellTowers, Random random)
     {
         try
         {
@@ -51,7 +51,7 @@ public class GraphColoringAlgorithm
             // if there is just one tower, assign any frequency to it
             if (cellTowers.Count == 1)
             {
-                int randomFreqIdx = new Random(seed).Next(0, numFrequencies);
+                int randomFreqIdx = random.Next(0, numFrequencies);
                 cellTowers[0].frequency = frequencyCount[randomFreqIdx].Item1; // assign the frequency to the tower
                 frequencyCount[randomFreqIdx] = (frequencyCount[randomFreqIdx].Item1, frequencyCount[randomFreqIdx].Item2 + 1); // increment the count of the frequency used
                 return frequencyCount;
@@ -66,6 +66,12 @@ public class GraphColoringAlgorithm
                 List<(CellTower, double)> nearbyTowers = currTower.NearbyCellTowers;
                 List<(CellTower, double)> outOfRangeTowers = currTower.OutOfRangeCellTowers;
 
+                // print the current tower and its neighbours
+                Console.WriteLine("Current Tower: " + currTower.Id + " Neighbours: " + string.Join(", ", nearbyTowers.Select(t => t.Item1.Id)));
+                // Console.WriteLine("Distances Nearby Towers: " + string.Join(", ", nearbyTowers.Select(t => t.Item2)));
+                Console.WriteLine("Current Tower: " + currTower.Id + " Out of Range Towers: " + string.Join(", ", outOfRangeTowers.Select(t => t.Item1.Id)));
+                // Console.WriteLine("Distances Out of Range Towers: " + string.Join(", ", outOfRangeTowers.Select(t => t.Item2)));
+
                 if (outOfRangeTowers.Count > 0) // there are some towers out of range
                 {
                     // find farthest tower
@@ -77,7 +83,7 @@ public class GraphColoringAlgorithm
                     // if current tower is the first i.e. no frequency assigned to any tower, 
                     // we assign any frequency to both the current tower and farthest tower
                     if (ctIdx == 0) {
-                        int randomFreqIdx = new Random(seed).Next(0, numFrequencies);
+                        int randomFreqIdx = random.Next(0, numFrequencies);
                         currTower.frequency = frequencyCount[randomFreqIdx].Item1;
                         farthestTower.frequency = currTower.frequency;
                         frequencyCount[randomFreqIdx] = (frequencyCount[randomFreqIdx].Item1, frequencyCount[randomFreqIdx].Item2 + 1);
@@ -114,6 +120,13 @@ public class GraphColoringAlgorithm
                             IncrementFrequencyCount(currTower);
                         }
                     }
+                    // print current tower frequency
+                    Console.WriteLine("Current Tower: " + currTower.Id + " Frequency: " + currTower.frequency);
+                    Console.WriteLine("Farthest Tower: " + farthestTower.Id + " Frequency: " + farthestTower.frequency);
+                }
+                else
+                {
+                    Console.WriteLine("--No out of range towers for current tower: " + currTower.Id);
                 }
             }
 

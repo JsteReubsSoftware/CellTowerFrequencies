@@ -39,22 +39,27 @@ public class CellTower
         double lat = cellTower.Latitude;
         double lon = cellTower.Longitude;
 
+        double distanceLat = (lat - Latitude) * Math.PI / 180;
+        double distanceLon = (lon - Longitude) * Math.PI / 180;
+
         // use Haversine formula
-        double a = Math.Pow(Math.Sin((lat - Latitude) * Math.PI / 180 / 2), 2) +
-            Math.Cos(Latitude * Math.PI / 180) * Math.Cos(lat * Math.PI / 180) *
-            Math.Pow(Math.Sin((lon - Longitude) * Math.PI / 180 / 2), 2);
+        double a = Math.Pow(Math.Sin(distanceLat / 2), 2) +
+                    Math.Cos(Latitude) * Math.Cos(lat) *
+                    Math.Pow(Math.Sin(distanceLon / 2), 2);
         double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-        double r = 6371; // Approximate Radius of Earth in kilometers
-        double distance = Math.Round(r * c * 1000, 4); // distance in meters
+        double radius = 6371; // radius of the Earth in kilometers
+        double distance = Math.Round(radius * c * 1000, 4); // distance in meters
 
         // check if the distance is less than the threshold
         if (distance < threshold)
         {
             _nearbyCellTowers.Add((cellTower, distance));
+            cellTower.NearbyCellTowers.Add((this, distance)); // add this cell tower to the nearby list of the other cell tower
         }
         else
         {
             _outOfRangeCellTowers.Add((cellTower, distance));
+            cellTower.OutOfRangeCellTowers.Add((this, distance)); // add this cell tower to the out of range list of the other cell tower
         }
 
     }
